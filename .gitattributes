@@ -1,0 +1,11 @@
+# Tell GitHub Linguist what to count
+# Dart files are gone — this is a TypeScript/JS project
+
+*.ts    linguist-language=TypeScript
+*.tsx   linguist-language=TypeScript
+*.js    linguist-language=JavaScript
+
+# Exclude build/config noise from language stats
+babel.config.js        linguist-vendored
+*.config.js            linguist-vendored
+infra/*.tf             linguist-language=HCL
