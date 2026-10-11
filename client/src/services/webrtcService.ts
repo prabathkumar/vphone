@@ -8,6 +8,7 @@ import {
   RTCSessionDescription,
   MediaStream,
 } from 'react-native-webrtc';
+import {WS_URL, WS_PATH} from '../config';
 
 // react-native-webrtc 118.x extends event-target-shim's EventTarget.
 // TypeScript can't always resolve the shim's addEventListener overloads,
@@ -21,8 +22,6 @@ function pcOn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (pc as any).addEventListener(event, handler);
 }
-
-const WS_URL = 'wss://api.vphone.app';
 
 const ICE_SERVERS = [
   {urls: 'stun:stun.l.google.com:19302'},
@@ -68,7 +67,7 @@ export class WebRTCService {
     this.callbacks.onStatusChange('connecting');
 
     try {
-      this.ws = new WebSocket(`${WS_URL}/signal?token=${token}`);
+      this.ws = new WebSocket(`${WS_URL}${WS_PATH}?token=${token}`);
 
       this.ws.onopen = () => {
         this._send({type: 'join', instanceId: this.instanceId});

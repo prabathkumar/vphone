@@ -14,7 +14,7 @@ const helmet  = require('helmet');
 
 const instanceManager = require('./instanceManager');
 const authMiddleware  = require('./auth');
-const { generateToken } = require('./auth');
+const { generateToken, verifyToken } = require('./auth');
 
 const app    = express();
 const server = http.createServer(app);
@@ -109,7 +109,22 @@ const rooms = new Map();
 wss.on('connection', (ws, req) => {
   const sessionId = uuidv4();
   ws.sessionId = sessionId;
-  console.log(`WS connect: ${sessionId}`);
+
+  // Extract and validate JWT from ?token= query param
+  const url = new URL(req.url, 'http://localhost');
+  const token = url.searchParams.get('token');
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      ws.userId = payload.userId;
+    } else {
+      ws.close(4001, 'Invalid token');
+      return;
+    }
+  }
+  // Android bridge connections won't have a user token — that's OK
+
+  console.log(`WS connect: ${sessionId} user=${ws.userId || 'android'}`);
 
   ws.on('message', (raw) => {
     let msg;

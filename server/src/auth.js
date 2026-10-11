@@ -27,5 +27,14 @@ function generateToken(userId) {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
 }
 
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
 module.exports = authMiddleware;
 module.exports.generateToken = generateToken;
+module.exports.verifyToken = verifyToken;

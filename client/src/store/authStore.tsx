@@ -11,9 +11,9 @@ import React, {
   ReactNode,
 } from 'react';
 import EncryptedStorage from 'react-native-encrypted-storage';
+import {API_URL} from '../config';
 
 const TOKEN_KEY = 'vphone_jwt';
-const API_URL = 'https://api.vphone.app';
 
 // ---------------------------------------------------------------------------
 // Types

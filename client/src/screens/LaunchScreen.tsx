@@ -11,9 +11,8 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useAuth} from '../store/authStore';
+import {API_URL} from '../config';
 import type {RootStackParamList} from '../App';
-
-const API_URL = 'https://api.vphone.app';
 type Props = NativeStackScreenProps<RootStackParamList, 'Launch'>;
 
 // ---------------------------------------------------------------------------
