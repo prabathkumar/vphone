@@ -52,6 +52,23 @@ mkdir -p /opt/vphone/android-images
 mkdir -p /opt/vphone/instances
 mkdir -p /opt/vphone/sessions
 
+# --- scrcpy-server jar download ---
+SCRCPY_VERSION="2.4"
+ASSETS_DIR="/opt/vphone/server/assets"
+mkdir -p "$ASSETS_DIR"
+if [ ! -f "$ASSETS_DIR/scrcpy-server.jar" ]; then
+  echo "Downloading scrcpy-server v${SCRCPY_VERSION}..."
+  wget -q -O "$ASSETS_DIR/scrcpy-server.jar" \
+    "https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VERSION}/scrcpy-server-v${SCRCPY_VERSION}"
+  echo "scrcpy-server.jar downloaded to $ASSETS_DIR"
+fi
+
+# --- ADB install ---
+apt-get install -y android-tools-adb
+
+# --- ffmpeg (for scrcpy H.264 → I420 conversion in bridge) ---
+apt-get install -y ffmpeg
+
 # --- Pull and start VPhone server ---
 mkdir -p /opt/vphone/server
 # Code is deployed via CI/CD — see .github/workflows/deploy.yml

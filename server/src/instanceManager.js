@@ -20,6 +20,18 @@ const INSTANCES_DIR = process.env.INSTANCES_DIR      || '/opt/vphone/instances';
 // Lazy-load the BrowserStack module only when needed
 const bs = BACKEND === 'browserstack' ? require('./browserstack') : null;
 
+// Signalling server WebSocket URL (bridge connects back to self)
+const SIGNALLING_WS = process.env.SIGNALLING_WS_URL || 'ws://localhost:3000/ws';
+
+// Active bridges: instanceId → ScrcpyBridge
+const bridges = new Map();
+
+// Lazy-require bridge (depends on wrtc which is optional in dev)
+function getBridgeClass() {
+  try { return require('./scrcpyBridge').ScrcpyBridge; }
+  catch (e) { console.warn('[InstanceManager] ScrcpyBridge unavailable:', e.message); return null; }
+}
+
 // In-memory store (replace with Redis/DB in production)
 const instances = new Map();
 
@@ -46,14 +58,30 @@ async function create({ region, plan, androidVersion, userId }) {
   if (BACKEND === 'browserstack') {
     // BrowserStack real-device session
     bs.createSession(id)
-      .then(({ sessionId, device, osVersion }) => {
+      .then(async ({ sessionId, device, osVersion, adbSerial }) => {
         const inst = instances.get(id);
-        if (inst) {
-          inst.bsSessionId = sessionId;
-          inst.device = device;
-          inst.osVersion = osVersion;
-          inst.status = 'running';
-          console.log(`BS session ${sessionId} ready for instance ${id} on ${device}`);
+        if (!inst) return;
+
+        inst.bsSessionId = sessionId;
+        inst.device      = device;
+        inst.osVersion   = osVersion;
+        inst.status      = 'running';
+        console.log(`BS session ${sessionId} ready for instance ${id} on ${device}`);
+
+        // Start the scrcpy WebRTC bridge for this session
+        const BridgeClass = getBridgeClass();
+        if (BridgeClass) {
+          // adbSerial is provided by BrowserStack's remote ADB endpoint
+          // If not returned, fall back to a placeholder (manual setup needed)
+          const serial = adbSerial || inst.adbSerial || `bs-${sessionId}`;
+          const bridge = new BridgeClass(id, serial, SIGNALLING_WS);
+          bridges.set(id, bridge);
+          bridge.start().catch(err => {
+            console.error(`Bridge start failed for ${id}:`, err.message);
+            inst.status = 'error';
+          });
+        } else {
+          console.warn(`[InstanceManager] No bridge — video won't stream for ${id}`);
         }
       })
       .catch(err => {
@@ -91,6 +119,15 @@ async function get(id, userId) {
 async function destroy(id, userId) {
   const inst = instances.get(id);
   if (!inst || inst.userId !== userId) throw new Error('Not found');
+
+  // Stop scrcpy bridge
+  const bridge = bridges.get(id);
+  if (bridge) { bridge.stop(); bridges.delete(id); }
+
+  // Stop BrowserStack session
+  if (BACKEND === 'browserstack' && inst.bsSessionId && bs) {
+    bs.stopSession(id).catch(e => console.error(`BS stop failed for ${id}:`, e.message));
+  }
 
   // Kill QEMU process
   try {

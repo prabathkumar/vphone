@@ -32,6 +32,9 @@ ios/Runner/GoogleService-Info.plist
 *.tfvars
 .terraform.lock.hcl
 
+# scrcpy server jar (downloaded separately via npm run download-scrcpy)
+server/assets/scrcpy-server.jar
+
 # Misc
 .DS_Store
 .idea/

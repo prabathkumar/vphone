@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest"
+    "test": "jest",
+    "download-scrcpy": "node scripts/downloadScrcpy.js",
+    "upload-scrcpy-to-bs": "node scripts/uploadScrcpyToBS.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -17,7 +19,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "@roamhq/wrtc": "^0.4.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.3",
