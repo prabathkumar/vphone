@@ -28,6 +28,9 @@
     "react-native-encrypted-storage": "4.0.3"
   },
   "devDependencies": {
+    "@react-native-community/cli": "13.6.9",
+    "@react-native-community/cli-platform-android": "13.6.9",
+    "@react-native-community/cli-platform-ios": "13.6.9",
     "@babel/core": "7.24.7",
     "@babel/preset-env": "7.24.7",
     "@babel/runtime": "7.24.7",
