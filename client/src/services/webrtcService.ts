@@ -1,5 +1,5 @@
 /**
- * WebRTC service — connects Flutter client to cloud Android via STUN/TURN.
+ * WebRTC service — connects RN client to cloud Android via STUN/TURN.
  * Uses react-native-webrtc (118.x), the most widely deployed RN WebRTC lib.
  */
 import {
@@ -7,9 +7,20 @@ import {
   RTCIceCandidate,
   RTCSessionDescription,
   MediaStream,
-  type RTCIceCandidateType,
-  type RTCSessionDescriptionType,
 } from 'react-native-webrtc';
+
+// react-native-webrtc 118.x extends event-target-shim's EventTarget.
+// TypeScript can't always resolve the shim's addEventListener overloads,
+// so we use a typed wrapper for event subscriptions.
+function pcOn(
+  pc: RTCPeerConnection,
+  event: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: (evt: any) => void,
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (pc as any).addEventListener(event, handler);
+}
 
 const WS_URL = 'wss://api.vphone.app';
 
@@ -73,8 +84,9 @@ export class WebRTCService {
           this._onError('Connection dropped');
         }
       };
-    } catch (e: any) {
-      this._onError(`Connect failed: ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this._onError(`Connect failed: ${msg}`);
     }
   }
 
@@ -111,13 +123,13 @@ export class WebRTCService {
   }
 
   // -------------------------------------------------------------------------
-  // WebRTC internals
+  // WebRTC internals — react-native-webrtc uses EventTarget, not on* props
   // -------------------------------------------------------------------------
 
   private _createPeerConnection(): void {
     this.pc = new RTCPeerConnection({iceServers: ICE_SERVERS});
 
-    this.pc.onicecandidate = (evt) => {
+    pcOn(this.pc, 'icecandidate', (evt) => {
       if (evt.candidate) {
         this._send({
           type: 'ice-candidate',
@@ -125,24 +137,26 @@ export class WebRTCService {
           payload: evt.candidate.toJSON(),
         });
       }
-    };
+    });
 
-    this.pc.ontrack = (evt) => {
-      if (evt.streams?.[0]) {
-        this.callbacks.onStream(evt.streams[0]);
+    pcOn(this.pc, 'track', (evt) => {
+      const stream: MediaStream | undefined = evt.streams?.[0];
+      if (stream) {
+        this.callbacks.onStream(stream);
         this.callbacks.onStatusChange('connected');
       }
-    };
+    });
 
-    this.pc.onconnectionstatechange = () => {
+    pcOn(this.pc, 'connectionstatechange', () => {
       const s = this.pc?.connectionState;
       if (s === 'failed' || s === 'disconnected') {
         this._onError('Peer connection lost');
       }
-    };
+    });
   }
 
   private async _onMessage(raw: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let msg: any;
     try {
       msg = JSON.parse(raw);
@@ -154,7 +168,8 @@ export class WebRTCService {
       case 'offer': {
         if (!this.pc) return;
         await this.pc.setRemoteDescription(
-          new RTCSessionDescription(msg.payload as RTCSessionDescriptionType),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          new RTCSessionDescription(msg.payload as any),
         );
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
@@ -168,9 +183,7 @@ export class WebRTCService {
 
       case 'ice-candidate': {
         if (!this.pc) return;
-        await this.pc.addIceCandidate(
-          new RTCIceCandidate(msg.payload as RTCIceCandidateType),
-        );
+        await this.pc.addIceCandidate(new RTCIceCandidate(msg.payload));
         break;
       }
 

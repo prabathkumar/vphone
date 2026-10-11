@@ -20,7 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
     "node-cron": "^3.0.3",
-    "@roamhq/wrtc": "^0.4.7"
+    "@roamhq/wrtc": "^0.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3",

@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ──────────────────────────────────────────────────────────────
-  # Server — lint + test
+  # Server — install + test
   # ──────────────────────────────────────────────────────────────
   server:
     name: Server (Node.js)
@@ -18,17 +18,21 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
-      - run: npm ci
-      - run: npm test --if-present
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test --if-present
 
   # ──────────────────────────────────────────────────────────────
   # React Native client — type-check + lint
-  # (Full APK/IPA build done via EAS Build on merge to main)
   # ──────────────────────────────────────────────────────────────
   client:
     name: RN Client (type-check + lint)
@@ -58,34 +62,6 @@ jobs:
         run: npm test -- --passWithNoTests
 
   # ──────────────────────────────────────────────────────────────
-  # EAS Build — Android debug APK on main branch
-  # ──────────────────────────────────────────────────────────────
-  eas-android:
-    name: EAS Android build
-    runs-on: ubuntu-latest
-    needs: client
-    if: github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: client/package-lock.json
-      - run: npm ci
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - name: EAS build (Android debug)
-        run: eas build --platform android --profile preview --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-  # ──────────────────────────────────────────────────────────────
   # Docker — build & push server image to GHCR
   # ──────────────────────────────────────────────────────────────
   docker:
@@ -95,11 +71,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: docker/build-push-action@v5
         with:
           context: server
