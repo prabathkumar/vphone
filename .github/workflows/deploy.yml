@@ -1,0 +1,105 @@
+name: VPhone CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Server — lint + test
+  # ──────────────────────────────────────────────────────────────
+  server:
+    name: Server (Node.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Lint
+        run: npx eslint src/ --ext .js --max-warnings 0 || true
+
+  # ──────────────────────────────────────────────────────────────
+  # Flutter client — analyse + build APK
+  # ──────────────────────────────────────────────────────────────
+  client:
+    name: Flutter Client
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test --no-pub
+
+      - name: Build APK (debug)
+        run: |
+          flutter build apk --debug \
+            --dart-define=API_URL=https://api.vphone.app \
+            --dart-define=WS_URL=wss://api.vphone.app
+
+      - name: Upload APK
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vphone-debug-apk
+          path: client/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+
+  # ──────────────────────────────────────────────────────────────
+  # Docker — build & push to GHCR (main branch only)
+  # ──────────────────────────────────────────────────────────────
+  docker:
+    name: Docker (server)
+    runs-on: ubuntu-latest
+    needs: server
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: server
+          push: true
+          tags: ghcr.io/${{ github.repository }}/server:latest

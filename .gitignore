@@ -1,0 +1,40 @@
+# Node
+node_modules/
+npm-debug.log*
+.env
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.g.dart
+*.freezed.dart
+pubspec.lock
+
+# Android
+*.keystore
+*.jks
+local.properties
+android/.gradle/
+android/app/google-services.json
+
+# iOS
+ios/Pods/
+ios/Runner/GoogleService-Info.plist
+*.ipa
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+*.log
+dist/
