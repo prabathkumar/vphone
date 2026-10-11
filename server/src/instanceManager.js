@@ -1,7 +1,11 @@
 /**
  * VPhone — Android Instance Manager
- * Creates and manages QEMU/KVM Android instances.
- * Each instance = one virtual Android phone in the cloud.
+ *
+ * Backend is selected via ANDROID_BACKEND env var:
+ *   "browserstack"  — BrowserStack real devices (dev / testing phase)
+ *   "qemu"          — QEMU/KVM on a Mumbai VM (production)
+ *
+ * Default: browserstack (so development works out of the box)
  */
 
 const { execSync, spawn } = require('child_process');
@@ -9,8 +13,12 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs   = require('fs');
 
+const BACKEND       = process.env.ANDROID_BACKEND || 'browserstack';
 const IMAGES_DIR    = process.env.ANDROID_IMAGES_DIR || '/opt/vphone/android-images';
 const INSTANCES_DIR = process.env.INSTANCES_DIR      || '/opt/vphone/instances';
+
+// Lazy-load the BrowserStack module only when needed
+const bs = BACKEND === 'browserstack' ? require('./browserstack') : null;
 
 // In-memory store (replace with Redis/DB in production)
 const instances = new Map();
@@ -18,29 +26,51 @@ const instances = new Map();
 /**
  * Create a new Android instance for a user.
  */
-async function create({ region, androidVersion, userId }) {
+async function create({ region, plan, androidVersion, userId }) {
   const id = uuidv4();
-  const port = await getFreePort();
 
   const instance = {
     id,
     userId,
-    region,
-    androidVersion,
-    status: 'starting',
-    port,
+    region: region || 'india-mumbai',
+    plan:   plan   || 'basic',
+    androidVersion: androidVersion || 13,
+    status: 'booting',
+    backend: BACKEND,
     createdAt: new Date().toISOString(),
     sessionToken: uuidv4(),
   };
 
   instances.set(id, instance);
 
-  // Async boot — client polls /instances/:id for status
-  bootAndroid(id, port, androidVersion).catch(err => {
-    console.error(`Boot failed for ${id}:`, err);
-    const inst = instances.get(id);
-    if (inst) inst.status = 'error';
-  });
+  if (BACKEND === 'browserstack') {
+    // BrowserStack real-device session
+    bs.createSession(id)
+      .then(({ sessionId, device, osVersion }) => {
+        const inst = instances.get(id);
+        if (inst) {
+          inst.bsSessionId = sessionId;
+          inst.device = device;
+          inst.osVersion = osVersion;
+          inst.status = 'running';
+          console.log(`BS session ${sessionId} ready for instance ${id} on ${device}`);
+        }
+      })
+      .catch(err => {
+        console.error(`BrowserStack boot failed for ${id}:`, err.message);
+        const inst = instances.get(id);
+        if (inst) inst.status = 'error';
+      });
+  } else {
+    // QEMU/KVM path (production Mumbai VM)
+    const port = await getFreePort();
+    instance.port = port;
+    bootAndroid(id, port, androidVersion || 13).catch(err => {
+      console.error(`QEMU boot failed for ${id}:`, err);
+      const inst = instances.get(id);
+      if (inst) inst.status = 'error';
+    });
+  }
 
   return { id, status: 'starting', region, androidVersion };
 }
