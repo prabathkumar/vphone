@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test --if-present
+        run: npx jest --passWithNoTests
 
   # ──────────────────────────────────────────────────────────────
   # React Native client — type-check + lint
